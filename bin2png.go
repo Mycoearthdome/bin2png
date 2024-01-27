@@ -166,6 +166,16 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 		bytes_to_write = append(bytes_to_write, bytes2[i]) //TODO:Imperfect. FIXME!
 	}
 
+	var count int = 0
+	for i := len(bytes2) - 1; i > 0; i-- {
+		if bytes_to_write[i] == 0xAA {
+			break
+		}
+		count++
+	}
+
+	bytes_to_write = bytes_to_write[:len(bytes_to_write)-count]
+
 	if AlteredBytes {
 		bytes_to_write = bytes_to_write[:len(bytes_to_write)-1]
 		//print("RECOVED ALTERED-->", len(bytes_to_write))
