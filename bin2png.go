@@ -38,6 +38,7 @@ func calculateImageDimensions(numBytes int) (int, int) {
 
 // saveImageAsJPEG saves an image as a JPEG file with the given name.
 func saveImageAsJPEG(filename string, img image.Image) error {
+	//JPEG compression alters the colors even with 100% quality...this is
 	out, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -73,7 +74,6 @@ func writeBytesToFile(filename string, data []byte) error {
 		return err
 	}
 	defer outfile.Close()
-
 	outfile.Write(data)
 
 	return nil
@@ -90,7 +90,6 @@ func Unpack_Image(jpegfile string) []byte {
 	if err != nil {
 		panic(err)
 	}
-	var Count_Stop int = 0
 	var Pixel color.NRGBA
 	// Convert the decoded image to RGBA model
 	rgba := image.NewNRGBA(decodedImg.Bounds())
@@ -99,7 +98,6 @@ func Unpack_Image(jpegfile string) []byte {
 			rgba.Set(x, y, decodedImg.At(x, y))
 			Pixel = rgba.NRGBAAt(x, y)
 			byteArray = append(byteArray, Pixel.R, Pixel.G, Pixel.B)
-			Count_Stop++
 		}
 	}
 
@@ -112,8 +110,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	var red, green, blue uint8 = 0, 0, 0
 	//var OldR, OldG, OldB uint8 = 0, 0, 0
 	var x, y int = 0, 0
-	var Count_Continue int = 0
-
 	var Pixel color.NRGBA
 	// Create a new RGB image with dimensions based on the number of bytes.
 	width, height := calculateImageDimensions(len(bytes))
@@ -145,7 +141,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 			Pixel.A = 255
 			img.SetNRGBA(x, y, Pixel)
 			x = x + 1
-			Count_Continue++
 		}
 	}
 	Pixel.R = red
@@ -165,14 +160,28 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	return nil
 }
 
+func Recover(bytes2 []byte, AlteredBytes bool) []byte {
+	var bytes_to_write []byte
+	for i := 0; i < len(bytes2); i++ {
+		bytes_to_write = append(bytes_to_write, bytes2[i]) //TODO:Imperfect. FIXME!
+	}
+
+	if AlteredBytes {
+		bytes_to_write = bytes_to_write[:len(bytes_to_write)-1]
+		//print("RECOVED ALTERED-->", len(bytes_to_write))
+	}
+
+	return bytes_to_write
+
+}
+
 func main() {
 
 	var bytes2 []byte
-	var bytes_to_write []byte
 	var AlteredBytes bool = false
 
 	if len(os.Args) != 2 {
-		fmt.Println("Usage: bin2jpeg <input_binary_file>")
+		fmt.Println("Usage: bin2png <input_binary_file>")
 		return
 	}
 
@@ -196,34 +205,17 @@ func main() {
 	}
 
 	if len(bytes)%2 == 0 {
-		//add a NOP to the original file to match len(bytes)%3
+		//add a byte to the original file to match len(bytes)%3
 		bytes = append(bytes, 0xAA)
 		AlteredBytes = true
 		//fmt.Printf("ALTERED!!!!-->%d\n", len(bytes))
 	}
 
 	if Pack_Binary(bytes, outputfile) == nil {
-		bytes2 = Unpack_Image(outputfile) //TODO:bytes2
+		bytes2 = Unpack_Image(outputfile)
 	}
 
-	var i int = 0
-	for _, byte := range bytes {
-		if byte == bytes2[i] {
-			//fmt.Printf("BYTE %d:Orignal=%d-->%d\n", i, byte, bytes2[i])
-			bytes_to_write = append(bytes_to_write, bytes2[i])
-
-		} else {
-			//fmt.Printf("BYTE %d:Orignal=%d-->%d\n", i, byte, bytes2[i+3])
-			bytes_to_write = append(bytes_to_write, bytes2[i+3])
-
-		}
-		i++
-	}
-
-	if AlteredBytes {
-		bytes_to_write = bytes_to_write[:len(bytes_to_write)-1]
-		//print("RECOVED ALTERED-->", len(bytes_to_write))
-	}
+	bytes_to_write := Recover(bytes2, AlteredBytes)
 
 	err = writeBytesToFile(unpacked_file, bytes_to_write)
 	if err != nil {
