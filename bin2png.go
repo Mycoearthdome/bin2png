@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"image"
@@ -80,9 +82,11 @@ func writeBytesToFile(filename string, data []byte) error {
 	return nil
 }
 
-func Unpack_Image(jpegfile string) []byte {
+func Unpack_Image(jpegfile string) ([]byte, []byte, []byte) {
 
 	var byteArray []byte
+	var checksum []byte
+	var EOF_Series []byte
 	file, err := os.Open(jpegfile)
 
 	defer file.Close()
@@ -102,7 +106,11 @@ func Unpack_Image(jpegfile string) []byte {
 		}
 	}
 
-	return byteArray
+	checksum = byteArray[:32]
+	EOF_Series = byteArray[32:44]
+	byteArray = byteArray[44:]
+
+	return checksum, EOF_Series, byteArray
 
 }
 
@@ -144,11 +152,11 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 			x = x + 1
 		}
 	}
-	Pixel.R = red
-	Pixel.G = green
-	Pixel.B = blue
-	Pixel.A = 255
-	img.SetNRGBA(x, y, Pixel)
+	//Pixel.R = red
+	//Pixel.G = green
+	//Pixel.B = blue
+	//Pixel.A = 255
+	//img.SetNRGBA(x, y, Pixel)
 
 	// Save the RGB image as a JPEG file.
 	err := saveImageAsPNG(outputfile, img)
@@ -169,7 +177,7 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 
 	var count int = 0
 	for i := len(bytes2) - 1; i > 0; i-- {
-		if bytes_to_write[i] == 0xFF {
+		if bytes_to_write[i] == 0xAA {
 			count++
 			break
 		}
@@ -187,12 +195,76 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 
 }
 
+func EOF(Original_hashing []byte, bytesO []byte, EOF_Series []byte) []byte {
+	var count int = 0
+	var Appended bool = false
+	var temp_bytes []byte
+	fmt.Println(Original_hashing)
+	for i := (len(bytesO) - 1); i >= 0; i-- {
+		for l := 1; l < (len(EOF_Series) - 1); l++ {
+			j := (len(EOF_Series) - l) //last byte of the series
+			//fmt.Println(i)
+			if bytesO[i] == EOF_Series[j] { //scanning every byte in the series against the byte.
+				//fmt.Println("HERE")
+				for k := 1; k < (len(EOF_Series) - 1); k++ {
+					if bytesO[i-k] == EOF_Series[j] { //scanning the bytes before bytes[i]
+						if i-k == 0 {
+							panic("Could not find a match!")
+						}
+						count++
+					}
+					//fmt.Println(j)
+					if count == (len(EOF_Series) - k - 1) { //j == 0 {
+						//fmt.Println("HERE!")
+
+						for m := -12; m < len(EOF_Series)-1; m++ {
+							hasher := sha256.New()
+							//fmt.Println("ZERO!")
+							temp_bytes = bytesO[:(i - m)]
+							temp_bytes = append(temp_bytes, EOF_Series...)
+
+							hasher.Write(temp_bytes)
+							hashSum := hasher.Sum(nil)
+							temp_bytes = nil
+							fmt.Println(hashSum)
+							if bytes.Equal(Original_hashing, hashSum) {
+								fmt.Println("Found!")
+								bytesO = bytesO[:(i - m)]
+								bytesO = append(bytesO, EOF_Series...)
+								Appended = true
+								break
+							}
+							hasher.Reset()
+						}
+					}
+					count = 0
+					//j--
+					if Appended {
+						break
+					}
+				}
+				if Appended {
+					break
+				}
+			}
+			if Appended {
+				break
+			}
+		}
+		if Appended {
+			break
+		}
+	}
+	return bytesO
+}
+
 func main() {
 
 	var e string
 	var r string
 	var bytes2 []byte
-	var AlteredBytes bool = false
+	var bytes3 []byte
+	//var AlteredBytes bool = false
 
 	flag.StringVar(&e, "e", "", "encode file")
 	flag.StringVar(&r, "r", "", "recover file")
@@ -208,6 +280,8 @@ func main() {
 		inputFile := e
 		outputfile := inputFile + ".png"
 		unpacked_file := outputfile + ".out"
+		var Original_hashing []byte
+		var EOF_Series []byte
 
 		// Open the binary file for reading.
 		file, err := os.Open(inputFile)
@@ -218,42 +292,92 @@ func main() {
 		defer file.Close()
 
 		// Read all the bytes from the file.
-		bytes, err := readBytesFromFile(file)
+		bytesO, err := readBytesFromFile(file)
 		if err != nil {
 			fmt.Printf("Error reading bytes: %v\n", err)
 			return
 		}
 
-		if len(bytes)%2 == 0 {
+		hasher := sha256.New()
+		hasher.Write(bytesO)
+		hashSum := hasher.Sum(nil)
+
+		//fmt.Println("ORIGNIAL_HASHING =", hashSum)
+
+		/*if (len(bytesO)+len(hashSum))%2 == 0 {
 			//add a byte to the original file to match len(bytes)%3
-			bytes = append(bytes, 0xFF)
+			bytesO = append(bytesO, 0xAA)
 			AlteredBytes = true
 			//fmt.Printf("ALTERED!!!!-->%d\n", len(bytes))
+		}*/
+		hashSum = append(hashSum, bytesO[len(bytesO)-12:]...) //12 bytes buffer saved as the markers of the end of the file.
+		hashSum = append(hashSum, bytesO...)
+
+		if Pack_Binary(hashSum, outputfile) == nil {
+			Original_hashing, EOF_Series, bytes2 = Unpack_Image(outputfile)
 		}
 
-		if Pack_Binary(bytes, outputfile) == nil {
-			bytes2 = Unpack_Image(outputfile)
+		if !bytes.Equal(hashSum[:32], Original_hashing) {
+			os.Exit(1)
 		}
 
-		bytes_to_write := Recover(bytes2, AlteredBytes)
+		bytes2 = EOF(Original_hashing, bytes2, EOF_Series) //Original_hashing
 
-		err = writeBytesToFile(unpacked_file, bytes_to_write)
+		//bytes_to_write := Recover(bytes2, AlteredBytes)
+
+		err = writeBytesToFile(unpacked_file, bytes2)
 		if err != nil {
 			panic(err)
 		}
 	}
 	if r != "" {
 		var err error
+		var Original_hashing []byte
+		var EOF_Series []byte
 		inputFile := r
-		bytes2 = Unpack_Image(inputFile)
+		Original_hashing, EOF_Series, bytes3 = Unpack_Image(inputFile)
+		//fmt.Println("Original_HASHING =", Original_hashing)
 		unpacked_file := inputFile + ".out"
 
-		bytes_to_write := Recover(bytes2, AlteredBytes)
+		//bytes_to_write := Recover(bytes2, AlteredBytes)
+		bytes3 = EOF(Original_hashing, bytes3, EOF_Series)
 
-		err = writeBytesToFile(unpacked_file, bytes_to_write)
+		hasher := sha256.New()
+		hasher.Write(bytes3)
+		hashSum := hasher.Sum(nil)
+
+		//fmt.Println("Adjusted Modified_HASHING =", hashSum)
+
+		/*err = writeBytesToFile(unpacked_file, bytes3)
 		if err != nil {
 			panic(err)
-		}
+		}*/
+
+		if bytes.Equal(Original_hashing, hashSum) {
+			fmt.Println("Recovered the file successfully!")
+			err = writeBytesToFile(unpacked_file, bytes3)
+			if err != nil {
+				panic(err)
+			}
+		} /*else {
+			hasher2 := sha256.New()
+			for i := 1; i < len(bytes3); i++ {
+
+				hasher2.Write(bytes3[:len(bytes3)-i])
+				hashSum2 := hasher2.Sum(nil)
+
+				fmt.Println("Modified_HASHING =", hashSum2)
+
+				if bytes.Equal(Original_hashing, hashSum2) {
+					err = writeBytesToFile(unpacked_file, bytes3[:len(bytes3)-i])
+					if err != nil {
+						panic(err)
+					}
+				}
+				hashSum2 = nil
+				hasher2.Reset()
+			}
+		}*/
 
 	}
 
