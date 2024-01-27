@@ -170,6 +170,7 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 	var count int = 0
 	for i := len(bytes2) - 1; i > 0; i-- {
 		if bytes_to_write[i] == 0xFF {
+			count++
 			break
 		}
 		count++
