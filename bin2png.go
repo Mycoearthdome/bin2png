@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
@@ -168,7 +169,7 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 
 	var count int = 0
 	for i := len(bytes2) - 1; i > 0; i-- {
-		if bytes_to_write[i] == 0xAA {
+		if bytes_to_write[i] == 0xFF {
 			break
 		}
 		count++
@@ -187,49 +188,72 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 
 func main() {
 
+	var e string
+	var r string
 	var bytes2 []byte
 	var AlteredBytes bool = false
 
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: bin2png <input_binary_file>")
+	flag.StringVar(&e, "e", "", "encode file")
+	flag.StringVar(&r, "r", "", "recover file")
+
+	flag.Parse()
+
+	if len(os.Args) != 3 {
+		fmt.Println("Usage: bin2png -e/-r <input_binary_file/input_encoded_file>")
 		return
 	}
 
-	inputFile := os.Args[1]
-	outputfile := inputFile + ".png"
-	unpacked_file := outputfile + ".out"
+	if e != "" {
+		inputFile := e
+		outputfile := inputFile + ".png"
+		unpacked_file := outputfile + ".out"
 
-	// Open the binary file for reading.
-	file, err := os.Open(inputFile)
-	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return
+		// Open the binary file for reading.
+		file, err := os.Open(inputFile)
+		if err != nil {
+			fmt.Printf("Error opening file: %v\n", err)
+			return
+		}
+		defer file.Close()
+
+		// Read all the bytes from the file.
+		bytes, err := readBytesFromFile(file)
+		if err != nil {
+			fmt.Printf("Error reading bytes: %v\n", err)
+			return
+		}
+
+		if len(bytes)%2 == 0 {
+			//add a byte to the original file to match len(bytes)%3
+			bytes = append(bytes, 0xFF)
+			AlteredBytes = true
+			//fmt.Printf("ALTERED!!!!-->%d\n", len(bytes))
+		}
+
+		if Pack_Binary(bytes, outputfile) == nil {
+			bytes2 = Unpack_Image(outputfile)
+		}
+
+		bytes_to_write := Recover(bytes2, AlteredBytes)
+
+		err = writeBytesToFile(unpacked_file, bytes_to_write)
+		if err != nil {
+			panic(err)
+		}
 	}
-	defer file.Close()
+	if r != "" {
+		var err error
+		inputFile := r
+		bytes2 = Unpack_Image(inputFile)
+		unpacked_file := inputFile + ".out"
 
-	// Read all the bytes from the file.
-	bytes, err := readBytesFromFile(file)
-	if err != nil {
-		fmt.Printf("Error reading bytes: %v\n", err)
-		return
-	}
+		bytes_to_write := Recover(bytes2, AlteredBytes)
 
-	if len(bytes)%2 == 0 {
-		//add a byte to the original file to match len(bytes)%3
-		bytes = append(bytes, 0xAA)
-		AlteredBytes = true
-		//fmt.Printf("ALTERED!!!!-->%d\n", len(bytes))
-	}
+		err = writeBytesToFile(unpacked_file, bytes_to_write)
+		if err != nil {
+			panic(err)
+		}
 
-	if Pack_Binary(bytes, outputfile) == nil {
-		bytes2 = Unpack_Image(outputfile)
-	}
-
-	bytes_to_write := Recover(bytes2, AlteredBytes)
-
-	err = writeBytesToFile(unpacked_file, bytes_to_write)
-	if err != nil {
-		panic(err)
 	}
 
 }
