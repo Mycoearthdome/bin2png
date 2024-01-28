@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"strings"
 )
 
 // readBytesFromFile reads all the bytes from a file and returns them as a slice.
@@ -195,70 +196,73 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 
 }
 
-func EOF(Original_hashing []byte, bytesO []byte, EOF_Series []byte) []byte {
+func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []byte) []byte {
 	var count int = 0
 	var Appended bool = false
 	var temp_bytes []byte
 	fmt.Println(Original_hashing)
 	for i := (len(bytesO) - 1); i >= 0; i-- {
-		for l := 1; l < (len(EOF_Series) - 1); l++ {
-			j := (len(EOF_Series) - l) //last byte of the series
+		for l := 0; l < (len(EOF_Series) - 1); l++ {
+			j := (len(EOF_Series) - 1 - l) //last byte of the series
+			if strings.Contains(filename, "txt") {
+				j = 0
+			}
 			//fmt.Println(i)
 			if bytesO[i] == EOF_Series[j] { //scanning every byte in the series against the byte.
 				//fmt.Println("HERE")
 				for k := 0; k < (len(EOF_Series) - 1); k++ {
 					if bytesO[i-k] == EOF_Series[j] { //scanning the bytes before bytes[i]
 						if i-k == 0 {
-							panic("Could not find a match!")
+							panic("ERROR:Could not find a match!")
 						}
 						count++
 					}
 					//fmt.Println(j)
-					if count == (len(EOF_Series) - k - 1) { //j == 0 {
-						//fmt.Println("HERE!")
+					//if count == (len(EOF_Series) - k - 1) { //j == 0 {
+					//fmt.Println("HERE!")
 
-						for m := -12; m < len(EOF_Series)-1; m++ {
+					for m := -12 + j; m < len(EOF_Series[j:]); m++ {
+						hasher := sha256.New()
+						//fmt.Println("ZERO!")
+						temp_bytes = bytesO[:(i - m)]
+						temp_bytes = append(temp_bytes, EOF_Series[j:]...)
+
+						hasher.Write(temp_bytes)
+						hashSum := hasher.Sum(nil)
+						temp_bytes = nil
+						//fmt.Println(hashSum)
+						if bytes.Equal(Original_hashing, hashSum) {
+							fmt.Println("Found!")
+							bytesO = bytesO[:(i - m)]
+							bytesO = append(bytesO, EOF_Series[j:]...)
+							Appended = true
+							break
+						}
+						hasher.Reset()
+					}
+					if !Appended {
+						for m := -12 + j; m < len(EOF_Series[j:]); m++ {
 							hasher := sha256.New()
 							//fmt.Println("ZERO!")
-							temp_bytes = bytesO[:(i - m)]
-							temp_bytes = append(temp_bytes, EOF_Series...)
+							temp_bytes = bytesO[:(i + m)]
+							temp_bytes = append(temp_bytes, EOF_Series[j:]...)
 
 							hasher.Write(temp_bytes)
 							hashSum := hasher.Sum(nil)
 							temp_bytes = nil
-							fmt.Println(hashSum)
+							//fmt.Println(hashSum)
 							if bytes.Equal(Original_hashing, hashSum) {
 								fmt.Println("Found!")
-								bytesO = bytesO[:(i - m)]
-								bytesO = append(bytesO, EOF_Series...)
+								bytesO = bytesO[:(i + m)]
+								bytesO = append(bytesO, EOF_Series[j:]...)
 								Appended = true
 								break
 							}
 							hasher.Reset()
 						}
-						if !Appended {
-							for m := -12; m < len(EOF_Series)-1; m++ {
-								hasher := sha256.New()
-								//fmt.Println("ZERO!")
-								temp_bytes = bytesO[:(i + m)]
-								temp_bytes = append(temp_bytes, EOF_Series...)
-
-								hasher.Write(temp_bytes)
-								hashSum := hasher.Sum(nil)
-								temp_bytes = nil
-								fmt.Println(hashSum)
-								if bytes.Equal(Original_hashing, hashSum) {
-									fmt.Println("Found!")
-									bytesO = bytesO[:(i + m)]
-									bytesO = append(bytesO, EOF_Series...)
-									Appended = true
-									break
-								}
-								hasher.Reset()
-							}
-						}
-
 					}
+
+					//}
 					count = 0
 					if Appended {
 						break
@@ -341,7 +345,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		bytes2 = EOF(Original_hashing, bytes2, EOF_Series) //Original_hashing
+		bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
 
 		//bytes_to_write := Recover(bytes2, AlteredBytes)
 
@@ -360,7 +364,7 @@ func main() {
 		unpacked_file := inputFile + ".out"
 
 		//bytes_to_write := Recover(bytes2, AlteredBytes)
-		bytes3 = EOF(Original_hashing, bytes3, EOF_Series)
+		bytes3 = EOF(Original_hashing, inputFile, bytes3, EOF_Series)
 
 		hasher := sha256.New()
 		hasher.Write(bytes3)
