@@ -103,7 +103,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	var Pixel color.NRGBA
 	// Create a new RGB image with dimensions based on the number of bytes.
 	width, height := calculateImageDimensions(int64(len(bytes)))
-	fmt.Println(width, height)
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Set the pixel values for each byte in the file.
@@ -145,7 +144,7 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []byte) []byte {
 	var Appended bool = false
 	var temp_bytes []byte
-	fmt.Println(Original_hashing)
+	fmt.Print("Running please wait ... ")
 	for i := (len(bytesO) - 1); i >= 0; i-- {
 		for l := 0; l < (len(EOF_Series) - 1); l++ {
 			j := (len(EOF_Series) - 1 - l) //last byte of the series
@@ -169,7 +168,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 						hashSum := hasher.Sum(nil)
 						temp_bytes = nil
 						if bytes.Equal(Original_hashing, hashSum) {
-							fmt.Println("Found!")
+							fmt.Println("Encoded!")
 							bytesO = bytesO[:(i - m)]
 							bytesO = append(bytesO, EOF_Series[j:]...)
 							Appended = true
@@ -188,7 +187,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 							temp_bytes = nil
 							//fmt.Println(hashSum)
 							if bytes.Equal(Original_hashing, hashSum) {
-								fmt.Println("Found!")
+								fmt.Println("Encoded!")
 								bytesO = bytesO[:(i + m)]
 								bytesO = append(bytesO, EOF_Series[j:]...)
 								Appended = true
