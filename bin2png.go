@@ -33,11 +33,12 @@ func readBytesFromFile(file *os.File) ([]byte, error) {
 func calculateImageDimensions(numBytes int64) (int, int) {
 
 	width := int(math.Sqrt(float64(numBytes / 3)))
-	height := int((numBytes/3)/int64(width) + 1)
+	height := int((numBytes/3)/int64(width) + 1) //last line will probably not be full.
 
 	return width, height
 }
 
+// saveImageasPNG saves image as PNG file.
 func saveImageAsPNG(filename string, img image.Image) error {
 	out, err := os.Create(filename)
 	if err != nil {
@@ -53,6 +54,7 @@ func saveImageAsPNG(filename string, img image.Image) error {
 	return nil
 }
 
+// writeBytesToFile self-explanatory
 func writeBytesToFile(filename string, data []byte) error {
 	outfile, err := os.Create(filename)
 	if err != nil {
@@ -64,21 +66,21 @@ func writeBytesToFile(filename string, data []byte) error {
 	return nil
 }
 
-func Unpack_Image(jpegfile string) ([]byte, []byte, []byte) {
+// Unpack_Image extracts 3 bytes per pixel in a byteArray
+func Unpack_Image(pngfile string) ([]byte, []byte, []byte) {
 
 	var byteArray []byte
 	var checksum []byte
 	var EOF_Series []byte
-	file, err := os.Open(jpegfile)
+	file, err := os.Open(pngfile)
 
 	defer file.Close()
-	//print("DECODED AS:\n")
 	decodedImg, _, err := image.Decode(file)
 	if err != nil {
 		panic(err)
 	}
 	var Pixel color.NRGBA
-	// Convert the decoded image to RGBA model
+	// Convert the decoded image to NRGBA model
 	rgba := image.NewNRGBA(decodedImg.Bounds())
 	for y := decodedImg.Bounds().Min.Y; y < decodedImg.Bounds().Max.Y; y++ {
 		for x := decodedImg.Bounds().Min.X; x < decodedImg.Bounds().Max.X; x++ {
@@ -96,6 +98,7 @@ func Unpack_Image(jpegfile string) ([]byte, []byte, []byte) {
 
 }
 
+// Pack_Binary convert bytes to pixels and saves that inside a PNG file.
 func Pack_Binary(bytes []byte, outputfile string) error {
 	Color := "Red"
 	var red, green, blue uint8 = 0, 0, 0
@@ -125,7 +128,7 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 			Pixel.R = red
 			Pixel.G = green
 			Pixel.B = blue
-			Pixel.A = 255
+			Pixel.A = 0 //Transparency or opacity 0 = transparent, 255 = opaque.
 			img.SetNRGBA(x, y, Pixel)
 			x = x + 1
 		}
@@ -141,10 +144,11 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	return nil
 }
 
+// EOF Hunts the last pixel line against the original hashing to position the last bytes saved as pixels earlier.
 func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []byte) []byte {
 	var Appended bool = false
 	var temp_bytes []byte
-	fmt.Print("Running please wait ... ")
+	//fmt.Print("Running please wait ... ")
 	for i := (len(bytesO) - 1); i >= 0; i-- {
 		for l := 0; l < (len(EOF_Series) - 1); l++ {
 			j := (len(EOF_Series) - 1 - l) //last byte of the series
@@ -168,7 +172,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 						hashSum := hasher.Sum(nil)
 						temp_bytes = nil
 						if bytes.Equal(Original_hashing, hashSum) {
-							fmt.Println("Encoded!")
+							//fmt.Println("Encoded!")
 							bytesO = bytesO[:(i - m)]
 							bytesO = append(bytesO, EOF_Series[j:]...)
 							Appended = true
@@ -187,7 +191,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 							temp_bytes = nil
 							//fmt.Println(hashSum)
 							if bytes.Equal(Original_hashing, hashSum) {
-								fmt.Println("Encoded!")
+								//fmt.Println("Encoded!")
 								bytesO = bytesO[:(i + m)]
 								bytesO = append(bytesO, EOF_Series[j:]...)
 								Appended = true
@@ -218,7 +222,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 func main() {
 	var e string
 	var r string
-	var bytes2 []byte
+	//var bytes2 []byte
 	var bytes3 []byte
 	var inputFiles []string
 
@@ -239,13 +243,13 @@ func main() {
 	}
 
 	for _, file := range inputFiles {
-		fmt.Println("Processing ...", file)
+		//fmt.Println("Processing ...", file)
 		if e != "" {
 			inputFile := file
 			outputfile := inputFile + ".png"
-			unpacked_file := outputfile + ".out"
-			var Original_hashing []byte
-			var EOF_Series []byte
+			//unpacked_file := outputfile + ".out"
+			//var Original_hashing []byte
+			//var EOF_Series []byte
 
 			// Open the binary file for reading.
 			file, err := os.Open(inputFile)
@@ -269,20 +273,23 @@ func main() {
 			hashSum = append(hashSum, bytesO[len(bytesO)-12:]...) //12 bytes buffer saved as the markers of the end of the file.
 			hashSum = append(hashSum, bytesO...)
 
-			if Pack_Binary(hashSum, outputfile) == nil {
-				Original_hashing, EOF_Series, bytes2 = Unpack_Image(outputfile)
-			}
+			Pack_Binary(hashSum, outputfile)
+			/*
+				if Pack_Binary(hashSum, outputfile) == nil {
+					Original_hashing, EOF_Series, bytes2 = Unpack_Image(outputfile)
+				}
 
-			if !bytes.Equal(hashSum[:32], Original_hashing) {
-				os.Exit(1)
-			}
+				if !bytes.Equal(hashSum[:32], Original_hashing) {
+					os.Exit(1)
+				}
 
-			bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
+				bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
 
-			err = writeBytesToFile(unpacked_file, bytes2)
-			if err != nil {
-				panic(err)
-			}
+				err = writeBytesToFile(unpacked_file, bytes2)
+				if err != nil {
+					panic(err)
+				}
+			*/
 		}
 		if r != "" {
 			var err error
@@ -305,7 +312,6 @@ func main() {
 					panic(err)
 				}
 			}
-
 		}
 	}
 }
