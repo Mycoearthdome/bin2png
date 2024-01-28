@@ -30,10 +30,10 @@ func readBytesFromFile(file *os.File) ([]byte, error) {
 }
 
 // calculateImageDimensions calculates the width and height of an image based on the number of bytes.
-func calculateImageDimensions(numBytes int) (int, int) {
+func calculateImageDimensions(numBytes int64) (int, int) {
 
-	width := int(math.Sqrt(float64(numBytes)))
-	height := width
+	width := int(math.Sqrt(float64(numBytes / 3)))
+	height := int((numBytes/3)/int64(width) + 1)
 
 	return width, height
 }
@@ -102,7 +102,8 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	var x, y int = 0, 0
 	var Pixel color.NRGBA
 	// Create a new RGB image with dimensions based on the number of bytes.
-	width, height := calculateImageDimensions(len(bytes))
+	width, height := calculateImageDimensions(int64(len(bytes)))
+	fmt.Println(width, height)
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 
 	// Set the pixel values for each byte in the file.
@@ -138,7 +139,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 		return err
 	}
 
-	//fmt.Println("Image saved successfully as output.jpg")
 	return nil
 }
 
