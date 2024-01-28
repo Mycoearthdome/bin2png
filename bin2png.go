@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
@@ -32,29 +31,11 @@ func readBytesFromFile(file *os.File) ([]byte, error) {
 
 // calculateImageDimensions calculates the width and height of an image based on the number of bytes.
 func calculateImageDimensions(numBytes int) (int, int) {
-	//width := 1
 
 	width := int(math.Sqrt(float64(numBytes)))
 	height := width
 
 	return width, height
-}
-
-// saveImageAsJPEG saves an image as a JPEG file with the given name.
-func saveImageAsJPEG(filename string, img image.Image) error {
-	//JPEG compression alters the colors even with 100% quality...this is
-	out, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	err = jpeg.Encode(out, img, &jpeg.Options{Quality: 100})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func saveImageAsPNG(filename string, img image.Image) error {
@@ -118,7 +99,6 @@ func Unpack_Image(jpegfile string) ([]byte, []byte, []byte) {
 func Pack_Binary(bytes []byte, outputfile string) error {
 	Color := "Red"
 	var red, green, blue uint8 = 0, 0, 0
-	//var OldR, OldG, OldB uint8 = 0, 0, 0
 	var x, y int = 0, 0
 	var Pixel color.NRGBA
 	// Create a new RGB image with dimensions based on the number of bytes.
@@ -134,15 +114,12 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 		switch Color {
 		case "Red":
 			red = uint8(b)
-			//OldR = red
 			Color = "Green"
 		case "Green":
 			green = uint8(b)
-			//OldG = green
 			Color = "Blue"
 		case "Blue":
 			blue = uint8(b)
-			//OldB = blue
 			Color = "Red"
 
 			Pixel.R = red
@@ -153,11 +130,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 			x = x + 1
 		}
 	}
-	//Pixel.R = red
-	//Pixel.G = green
-	//Pixel.B = blue
-	//Pixel.A = 255
-	//img.SetNRGBA(x, y, Pixel)
 
 	// Save the RGB image as a JPEG file.
 	err := saveImageAsPNG(outputfile, img)
@@ -170,32 +142,6 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 	return nil
 }
 
-func Recover(bytes2 []byte, AlteredBytes bool) []byte {
-	var bytes_to_write []byte
-	for i := 0; i < len(bytes2); i++ {
-		bytes_to_write = append(bytes_to_write, bytes2[i]) //TODO:Imperfect. FIXME!
-	}
-
-	var count int = 0
-	for i := len(bytes2) - 1; i > 0; i-- {
-		if bytes_to_write[i] == 0xAA {
-			count++
-			break
-		}
-		count++
-	}
-
-	bytes_to_write = bytes_to_write[:len(bytes_to_write)-count]
-
-	if AlteredBytes {
-		bytes_to_write = bytes_to_write[:len(bytes_to_write)-1]
-		//print("RECOVED ALTERED-->", len(bytes_to_write))
-	}
-
-	return bytes_to_write
-
-}
-
 func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []byte) []byte {
 	var Appended bool = false
 	var temp_bytes []byte
@@ -206,7 +152,7 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 			if strings.Contains(filename, "txt") {
 				j = 0
 			}
-			//fmt.Println(i)
+			//fmt.Println(j)
 			if bytesO[i] == EOF_Series[j] { //scanning every byte in the series against the byte.
 				for k := 0; k < (len(EOF_Series) - 1); k++ {
 					if bytesO[i-k] == EOF_Series[j] { //scanning the bytes before bytes[i]
@@ -275,7 +221,6 @@ func main() {
 	var r string
 	var bytes2 []byte
 	var bytes3 []byte
-	//var AlteredBytes bool = false
 
 	flag.StringVar(&e, "e", "", "encode file")
 	flag.StringVar(&r, "r", "", "recover file")
@@ -313,14 +258,6 @@ func main() {
 		hasher.Write(bytesO)
 		hashSum := hasher.Sum(nil)
 
-		//fmt.Println("ORIGNIAL_HASHING =", hashSum)
-
-		/*if (len(bytesO)+len(hashSum))%2 == 0 {
-			//add a byte to the original file to match len(bytes)%3
-			bytesO = append(bytesO, 0xAA)
-			AlteredBytes = true
-			//fmt.Printf("ALTERED!!!!-->%d\n", len(bytes))
-		}*/
 		hashSum = append(hashSum, bytesO[len(bytesO)-12:]...) //12 bytes buffer saved as the markers of the end of the file.
 		hashSum = append(hashSum, bytesO...)
 
@@ -334,8 +271,6 @@ func main() {
 
 		bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
 
-		//bytes_to_write := Recover(bytes2, AlteredBytes)
-
 		err = writeBytesToFile(unpacked_file, bytes2)
 		if err != nil {
 			panic(err)
@@ -347,22 +282,13 @@ func main() {
 		var EOF_Series []byte
 		inputFile := r
 		Original_hashing, EOF_Series, bytes3 = Unpack_Image(inputFile)
-		//fmt.Println("Original_HASHING =", Original_hashing)
 		unpacked_file := inputFile + ".out"
 
-		//bytes_to_write := Recover(bytes2, AlteredBytes)
 		bytes3 = EOF(Original_hashing, inputFile, bytes3, EOF_Series)
 
 		hasher := sha256.New()
 		hasher.Write(bytes3)
 		hashSum := hasher.Sum(nil)
-
-		//fmt.Println("Adjusted Modified_HASHING =", hashSum)
-
-		/*err = writeBytesToFile(unpacked_file, bytes3)
-		if err != nil {
-			panic(err)
-		}*/
 
 		if bytes.Equal(Original_hashing, hashSum) {
 			fmt.Println("Recovered the file successfully!")
@@ -370,25 +296,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-		} /*else {
-			hasher2 := sha256.New()
-			for i := 1; i < len(bytes3); i++ {
-
-				hasher2.Write(bytes3[:len(bytes3)-i])
-				hashSum2 := hasher2.Sum(nil)
-
-				fmt.Println("Modified_HASHING =", hashSum2)
-
-				if bytes.Equal(Original_hashing, hashSum2) {
-					err = writeBytesToFile(unpacked_file, bytes3[:len(bytes3)-i])
-					if err != nil {
-						panic(err)
-					}
-				}
-				hashSum2 = nil
-				hasher2.Reset()
-			}
-		}*/
+		}
 
 	}
 
