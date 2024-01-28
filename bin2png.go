@@ -220,83 +220,92 @@ func main() {
 	var r string
 	var bytes2 []byte
 	var bytes3 []byte
+	var inputFiles []string
 
 	flag.StringVar(&e, "e", "", "encode file")
 	flag.StringVar(&r, "r", "", "recover file")
 
 	flag.Parse()
 
-	if len(os.Args) != 3 {
+	if len(os.Args) < 3 {
 		fmt.Println("Usage: bin2png -e/-r <input_binary_file/input_encoded_file>")
 		return
 	}
 
-	if e != "" {
-		inputFile := e
-		outputfile := inputFile + ".png"
-		unpacked_file := outputfile + ".out"
-		var Original_hashing []byte
-		var EOF_Series []byte
-
-		// Open the binary file for reading.
-		file, err := os.Open(inputFile)
-		if err != nil {
-			fmt.Printf("Error opening file: %v\n", err)
-			return
-		}
-		defer file.Close()
-
-		// Read all the bytes from the file.
-		bytesO, err := readBytesFromFile(file)
-		if err != nil {
-			fmt.Printf("Error reading bytes: %v\n", err)
-			return
-		}
-
-		hasher := sha256.New()
-		hasher.Write(bytesO)
-		hashSum := hasher.Sum(nil)
-
-		hashSum = append(hashSum, bytesO[len(bytesO)-12:]...) //12 bytes buffer saved as the markers of the end of the file.
-		hashSum = append(hashSum, bytesO...)
-
-		if Pack_Binary(hashSum, outputfile) == nil {
-			Original_hashing, EOF_Series, bytes2 = Unpack_Image(outputfile)
-		}
-
-		if !bytes.Equal(hashSum[:32], Original_hashing) {
-			os.Exit(1)
-		}
-
-		bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
-
-		err = writeBytesToFile(unpacked_file, bytes2)
-		if err != nil {
-			panic(err)
+	for i, arg := range os.Args {
+		if i >= 3 {
+			inputFiles = append(inputFiles, arg)
 		}
 	}
-	if r != "" {
-		var err error
-		var Original_hashing []byte
-		var EOF_Series []byte
-		inputFile := r
-		Original_hashing, EOF_Series, bytes3 = Unpack_Image(inputFile)
-		unpacked_file := inputFile + ".out"
 
-		bytes3 = EOF(Original_hashing, inputFile, bytes3, EOF_Series)
+	for _, file := range inputFiles {
+		if e != "" {
+			inputFile := file
+			outputfile := inputFile + ".png"
+			unpacked_file := outputfile + ".out"
+			var Original_hashing []byte
+			var EOF_Series []byte
 
-		hasher := sha256.New()
-		hasher.Write(bytes3)
-		hashSum := hasher.Sum(nil)
+			// Open the binary file for reading.
+			file, err := os.Open(inputFile)
+			if err != nil {
+				fmt.Printf("Error opening file: %v\n", err)
+				return
+			}
+			defer file.Close()
 
-		if bytes.Equal(Original_hashing, hashSum) {
-			fmt.Println("Recovered the file successfully!")
-			err = writeBytesToFile(unpacked_file, bytes3)
+			// Read all the bytes from the file.
+			bytesO, err := readBytesFromFile(file)
+			if err != nil {
+				fmt.Printf("Error reading bytes: %v\n", err)
+				return
+			}
+
+			hasher := sha256.New()
+			hasher.Write(bytesO)
+			hashSum := hasher.Sum(nil)
+
+			hashSum = append(hashSum, bytesO[len(bytesO)-12:]...) //12 bytes buffer saved as the markers of the end of the file.
+			hashSum = append(hashSum, bytesO...)
+
+			if Pack_Binary(hashSum, outputfile) == nil {
+				Original_hashing, EOF_Series, bytes2 = Unpack_Image(outputfile)
+			}
+
+			if !bytes.Equal(hashSum[:32], Original_hashing) {
+				os.Exit(1)
+			}
+
+			bytes2 = EOF(Original_hashing, inputFile, bytes2, EOF_Series) //Original_hashing
+
+			err = writeBytesToFile(unpacked_file, bytes2)
 			if err != nil {
 				panic(err)
 			}
 		}
+		if r != "" {
+			var err error
+			var Original_hashing []byte
+			var EOF_Series []byte
+			inputFile := r
+			Original_hashing, EOF_Series, bytes3 = Unpack_Image(inputFile)
+			unpacked_file := inputFile + ".out"
 
+			bytes3 = EOF(Original_hashing, inputFile, bytes3, EOF_Series)
+
+			hasher := sha256.New()
+			hasher.Write(bytes3)
+			hashSum := hasher.Sum(nil)
+
+			if bytes.Equal(Original_hashing, hashSum) {
+				fmt.Println("Recovered the file successfully!")
+				err = writeBytesToFile(unpacked_file, bytes3)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+		}
 	}
 
 }
