@@ -206,7 +206,7 @@ func EOF(Original_hashing []byte, bytesO []byte, EOF_Series []byte) []byte {
 			//fmt.Println(i)
 			if bytesO[i] == EOF_Series[j] { //scanning every byte in the series against the byte.
 				//fmt.Println("HERE")
-				for k := 1; k < (len(EOF_Series) - 1); k++ {
+				for k := 0; k < (len(EOF_Series) - 1); k++ {
 					if bytesO[i-k] == EOF_Series[j] { //scanning the bytes before bytes[i]
 						if i-k == 0 {
 							panic("Could not find a match!")
@@ -236,9 +236,30 @@ func EOF(Original_hashing []byte, bytesO []byte, EOF_Series []byte) []byte {
 							}
 							hasher.Reset()
 						}
+						if !Appended {
+							for m := -12; m < len(EOF_Series)-1; m++ {
+								hasher := sha256.New()
+								//fmt.Println("ZERO!")
+								temp_bytes = bytesO[:(i + m)]
+								temp_bytes = append(temp_bytes, EOF_Series...)
+
+								hasher.Write(temp_bytes)
+								hashSum := hasher.Sum(nil)
+								temp_bytes = nil
+								fmt.Println(hashSum)
+								if bytes.Equal(Original_hashing, hashSum) {
+									fmt.Println("Found!")
+									bytesO = bytesO[:(i + m)]
+									bytesO = append(bytesO, EOF_Series...)
+									Appended = true
+									break
+								}
+								hasher.Reset()
+							}
+						}
+
 					}
 					count = 0
-					//j--
 					if Appended {
 						break
 					}
@@ -259,7 +280,6 @@ func EOF(Original_hashing []byte, bytesO []byte, EOF_Series []byte) []byte {
 }
 
 func main() {
-
 	var e string
 	var r string
 	var bytes2 []byte
