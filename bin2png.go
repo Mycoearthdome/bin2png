@@ -128,7 +128,7 @@ func Pack_Binary(bytes []byte, outputfile string) error {
 			Pixel.R = red
 			Pixel.G = green
 			Pixel.B = blue
-			Pixel.A = 0 //Transparency or opacity 0 = transparent, 255 = opaque.
+			Pixel.A = 255 //Transparency or opacity 0 = transparent, 255 = opaque.
 			img.SetNRGBA(x, y, Pixel)
 			x = x + 1
 		}
