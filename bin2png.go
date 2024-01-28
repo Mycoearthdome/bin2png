@@ -228,7 +228,7 @@ func main() {
 	flag.Parse()
 
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: bin2png -e/-r <input_binary_file/input_encoded_file>")
+		fmt.Println("Usage: bin2png -e/-r <input_binary_file/input_encoded_file> [use of wildcards is accepted]")
 		return
 	}
 
