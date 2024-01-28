@@ -233,12 +233,13 @@ func main() {
 	}
 
 	for i, arg := range os.Args {
-		if i >= 3 {
+		if i >= 2 {
 			inputFiles = append(inputFiles, arg)
 		}
 	}
 
 	for _, file := range inputFiles {
+		fmt.Println("Processing ...", file)
 		if e != "" {
 			inputFile := file
 			outputfile := inputFile + ".png"
@@ -287,7 +288,7 @@ func main() {
 			var err error
 			var Original_hashing []byte
 			var EOF_Series []byte
-			inputFile := r
+			inputFile := file
 			Original_hashing, EOF_Series, bytes3 = Unpack_Image(inputFile)
 			unpacked_file := inputFile + ".out"
 
@@ -307,5 +308,4 @@ func main() {
 
 		}
 	}
-
 }
