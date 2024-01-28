@@ -197,7 +197,6 @@ func Recover(bytes2 []byte, AlteredBytes bool) []byte {
 }
 
 func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []byte) []byte {
-	var count int = 0
 	var Appended bool = false
 	var temp_bytes []byte
 	fmt.Println(Original_hashing)
@@ -209,28 +208,20 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 			}
 			//fmt.Println(i)
 			if bytesO[i] == EOF_Series[j] { //scanning every byte in the series against the byte.
-				//fmt.Println("HERE")
 				for k := 0; k < (len(EOF_Series) - 1); k++ {
 					if bytesO[i-k] == EOF_Series[j] { //scanning the bytes before bytes[i]
 						if i-k == 0 {
 							panic("ERROR:Could not find a match!")
 						}
-						count++
 					}
-					//fmt.Println(j)
-					//if count == (len(EOF_Series) - k - 1) { //j == 0 {
-					//fmt.Println("HERE!")
-
 					for m := -12 + j; m < len(EOF_Series[j:]); m++ {
 						hasher := sha256.New()
-						//fmt.Println("ZERO!")
 						temp_bytes = bytesO[:(i - m)]
 						temp_bytes = append(temp_bytes, EOF_Series[j:]...)
 
 						hasher.Write(temp_bytes)
 						hashSum := hasher.Sum(nil)
 						temp_bytes = nil
-						//fmt.Println(hashSum)
 						if bytes.Equal(Original_hashing, hashSum) {
 							fmt.Println("Found!")
 							bytesO = bytesO[:(i - m)]
@@ -243,7 +234,6 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 					if !Appended {
 						for m := -12 + j; m < len(EOF_Series[j:]); m++ {
 							hasher := sha256.New()
-							//fmt.Println("ZERO!")
 							temp_bytes = bytesO[:(i + m)]
 							temp_bytes = append(temp_bytes, EOF_Series[j:]...)
 
@@ -261,9 +251,6 @@ func EOF(Original_hashing []byte, filename string, bytesO []byte, EOF_Series []b
 							hasher.Reset()
 						}
 					}
-
-					//}
-					count = 0
 					if Appended {
 						break
 					}
